@@ -40,7 +40,7 @@ mainSteps:
               if [ -n "{{ username }}" ]; then
                 ./easyrsa revoke {{ username }}
                 ./easyrsa gen-crl
-                cp pki/crl.pem /etc/openvpn/
+                cp pki/crl.pem /etc/openvpn/server/
                 systemctl restart openvpn-server@server
                 echo "User {{ username }} revoked successfully"
               else
@@ -51,10 +51,10 @@ mainSteps:
             "update_routes")
               if [ -n "{{ routes }}" ]; then
                 # Backup current config
-                cp /etc/openvpn/server.conf /etc/openvpn/server.conf.backup
+                cp /etc/openvpn/server/server.conf /etc/openvpn/server/server.conf.backup
                 
                 # Remove existing push routes
-                sed -i '/^push "route /d' /etc/openvpn/server.conf
+                sed -i '/^push "route /d' /etc/openvpn/server/server.conf
                 
                 # Add new routes
                 IFS=',' read -a ROUTE_ARRAY <<< "{{ routes }}"
@@ -68,7 +68,7 @@ mainSteps:
                     network = ipaddress.IPv4Network('$route', strict=False)
                     print(str(network.netmask))
                     ")
-                    echo "push \"route $network $netmask\"" >> /etc/openvpn/server.conf
+                    echo "push \"route $network $netmask\"" >> /etc/openvpn/server/server.conf
                   fi
                 done
                 

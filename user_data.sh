@@ -25,11 +25,12 @@ echo -ne '\n' | ./easyrsa build-ca nopass
 ./easyrsa --batch build-server-full server nopass
 ./easyrsa gen-crl
 
-# Copy server keys
-cp pki/ca.crt pki/private/server.key pki/issued/server.crt pki/dh.pem /etc/openvpn/
+# Copy server keys to server directory
+mkdir -p /etc/openvpn/server
+cp pki/ca.crt pki/private/server.key pki/issued/server.crt pki/dh.pem /etc/openvpn/server/
 
 # Create server config
-cat > /etc/openvpn/server.conf <<EOF
+cat > /etc/openvpn/server/server.conf <<EOF
 port 1194
 proto udp
 dev tun
