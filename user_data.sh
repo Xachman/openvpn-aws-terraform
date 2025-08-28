@@ -22,7 +22,7 @@ cd $EASYRSA_DIR
 ./easyrsa init-pki
 echo -ne '\n' | ./easyrsa build-ca nopass
 ./easyrsa gen-dh
-./easyrsa build-server-full server nopass
+./easyrsa --batch build-server-full server nopass
 ./easyrsa gen-crl
 
 # Copy server keys
@@ -57,13 +57,6 @@ ETH_IF=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
 iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o $ETH_IF -j MASQUERADE
 service iptables save
 
-# Create VPN users
-for user in ${openvpn_users}; do
-  ./easyrsa build-client-full $user nopass
-  mkdir -p /etc/openvpn/clients/$user
-  cp pki/ca.crt pki/issued/$user.crt pki/private/$user.key /etc/openvpn/clients/$user/
-done
-
 # Enable and start OpenVPN
-systemctl enable openvpn@server
-systemctl start openvpn@server
+systemctl enable openvpn-server@server
+systemctl start openvpn-server@server

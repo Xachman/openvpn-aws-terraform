@@ -1,0 +1,86 @@
+schemaVersion: '2.2'
+description: Manage OpenVPN users and routes
+parameters:
+  action:
+    type: String
+    description: Action to perform (add_user, remove_user, update_routes)
+    allowedValues:
+      - add_user
+      - remove_user
+      - update_routes
+  username:
+    type: String
+    description: Username for add/remove operations
+    default: ""
+  routes:
+    type: String
+    description: Comma-separated routes for update_routes action
+    default: ""
+mainSteps:
+  - action: aws:runShellScript
+    name: executeOpenVPNCommand
+    inputs:
+      timeoutSeconds: '300'
+      runCommand:
+        - |
+          #!/bin/bash
+          cd /etc/openvpn/easy-rsa
+          
+          case "{{ action }}" in
+            "add_user")
+              if [ -n "{{ username }}" ]; then
+                ./easyrsa build-client-full {{ username }} nopass
+                echo "User {{ username }} added successfully"
+              else
+                echo "Username parameter is required for add_user action"
+                exit 1
+              fi
+              ;;
+            "remove_user")
+              if [ -n "{{ username }}" ]; then
+                ./easyrsa revoke {{ username }}
+                ./easyrsa gen-crl
+                cp pki/crl.pem /etc/openvpn/
+                systemctl restart openvpn-server@server
+                echo "User {{ username }} revoked successfully"
+              else
+                echo "Username parameter is required for remove_user action"
+                exit 1
+              fi
+              ;;
+            "update_routes")
+              if [ -n "{{ routes }}" ]; then
+                # Backup current config
+                cp /etc/openvpn/server.conf /etc/openvpn/server.conf.backup
+                
+                # Remove existing push routes
+                sed -i '/^push "route /d' /etc/openvpn/server.conf
+                
+                # Add new routes
+                IFS=',' read -a ROUTE_ARRAY <<< "{{ routes }}"
+                for route in "${ROUTE_ARRAY[@]}"; do
+                  route=$(echo $route | xargs)  # trim whitespace
+                  if [[ $route =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+                    network=$(echo $route | cut -d'/' -f1)
+                    cidr=$(echo $route | cut -d'/' -f2)
+                    netmask=$(python3 -c "
+                    import ipaddress
+                    network = ipaddress.IPv4Network('$route', strict=False)
+                    print(str(network.netmask))
+                    ")
+                    echo "push \"route $network $netmask\"" >> /etc/openvpn/server.conf
+                  fi
+                done
+                
+                systemctl restart openvpn-server@server
+                echo "Routes updated successfully: {{ routes }}"
+              else
+                echo "Routes parameter is required for update_routes action"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Invalid action: {{ action }}"
+              exit 1
+              ;;
+          esac
